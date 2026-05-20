@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Digital Board</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <div class="header">
+    <h1>✋ Digital Board</h1>
+    <p>Use hand gestures to draw | Controls on the right panel</p>
+  </div>
+
+  <div class="main">
+
+    <!-- Left: Camera + Canvas side by side -->
+    <div class="streams">
+      <div class="stream-box">
+        <p class="stream-label">📷 Camera + Drawing</p>
+        <img src="/video_feed" alt="Camera Feed" />
+      </div>
+      <div class="stream-box">
+        <p class="stream-label">🖼️ Canvas Only</p>
+        <img src="/canvas_feed" alt="Canvas Feed" />
+      </div>
+    </div>
+
+    <!-- Right: Control Panel -->
+    <div class="panel">
+
+      <!-- Status -->
+      <div class="section">
+        <h3>📊 Status</h3>
+        <div id="status-box">
+          <p>Mode: <span id="s-mode">-</span></p>
+          <p>Tool: <span id="s-tool">-</span></p>
+          <p>Size: <span id="s-size">-</span></p>
+        </div>
+      </div>
+
+      <!-- Colors -->
+      <div class="section">
+        <h3>🎨 Colors</h3>
+        <div class="btn-grid">
+          <button class="color-btn" style="background:#e74c3c"
+                  onclick="setColor('Red')">Red</button>
+          <button class="color-btn" style="background:#2ecc71"
+                  onclick="setColor('Green')">Green</button>
+          <button class="color-btn" style="background:#3498db"
+                  onclick="setColor('Blue')">Blue</button>
+          <button class="color-btn" style="background:#f1c40f;color:#000"
+                  onclick="setColor('Yellow')">Yellow</button>
+          <button class="color-btn" style="background:#fff;color:#000"
+                  onclick="setColor('White')">White</button>
+        </div>
+      </div>
+
+      <!-- Pen Tools -->
+      <div class="section">
+        <h3>🖊️ Pen Tools</h3>
+        <div class="btn-grid">
+          <button class="tool-btn" onclick="setTool('Normal')">Normal</button>
+          <button class="tool-btn" onclick="setTool('Dotted')">Dotted</button>
+          <button class="tool-btn" onclick="setTool('Highlighter')">Highlighter</button>
+          <button class="tool-btn" onclick="setTool('Spray')">Spray</button>
+        </div>
+      </div>
+
+      <!-- Thickness -->
+      <div class="section">
+        <h3>📏 Thickness</h3>
+        <div class="btn-grid">
+          <button class="tool-btn" onclick="setThickness('XS')">XS</button>
+          <button class="tool-btn" onclick="setThickness('S')">S</button>
+          <button class="tool-btn" onclick="setThickness('M')">M</button>
+          <button class="tool-btn" onclick="setThickness('L')">L</button>
+          <button class="tool-btn" onclick="setThickness('XL')">XL</button>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="section">
+        <h3>⚡ Actions</h3>
+        <button class="action-btn clear-btn" onclick="clearCanvas()">
+          🗑️ Clear Canvas
+        </button>
+        <button class="action-btn save-btn" onclick="saveCanvas()">
+          💾 Save Canvas
+        </button>
+        <div id="toast"></div>
+      </div>
+
+      <!-- Gesture Guide -->
+      <div class="section guide">
+        <h3>✋ Gesture Guide</h3>
+        <table>
+          <tr><td>✌️ 2 fingers</td><td>Writing</td></tr>
+          <tr><td>🤟 3 fingers</td><td>Draw Shape</td></tr>
+          <tr><td>✊ Fist</td><td>Snap Shape</td></tr>
+          <tr><td>🖐️ 4+ fingers</td><td>Erase</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── API Calls ────────────────────────────────────────────
+    async function setColor(name) {
+      await fetch('/set_color', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({color: name})
+      });
+      showToast('Color → ' + name);
+    }
+
+    async function setTool(tool) {
+      await fetch('/set_tool', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tool: tool})
+      });
+      showToast('Tool → ' + tool);
+    }
+
+    async function setThickness(size) {
+      await fetch('/set_thickness', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({size: size})
+      });
+      showToast('Size → ' + size);
+    }
+
+    async function clearCanvas() {
+      await fetch('/clear', {method: 'POST'});
+      showToast('Canvas Cleared!');
+    }
+
+    async function saveCanvas() {
+      await fetch('/save', {method: 'POST'});
+      showToast('Canvas Saved as canvas_saved.png');
+    }
+
+    // ── Status Updater ───────────────────────────────────────
+    async function updateStatus() {
+      try {
+        const res  = await fetch('/status');
+        const data = await res.json();
+        document.getElementById('s-mode').textContent = data.mode;
+        document.getElementById('s-tool').textContent = data.tool;
+        document.getElementById('s-size').textContent = data.thickness;
+      } catch(e) {}
+    }
+    setInterval(updateStatus, 1000);
+
+    // ── Toast Notification ───────────────────────────────────
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.opacity = '1';
+      setTimeout(() => t.style.opacity = '0', 2000);
+    }
+  </script>
+
+</body>
+</html>

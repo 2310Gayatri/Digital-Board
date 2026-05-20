@@ -1,0 +1,200 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0f0f1a;
+  color: #fff;
+  font-family: 'Segoe UI', sans-serif;
+  min-height: 100vh;
+}
+
+.header {
+  text-align: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border-bottom: 2px solid #0f3460;
+}
+
+.header h1 {
+  font-size: 2rem;
+  color: #00d4ff;
+  margin-bottom: 6px;
+}
+
+.header p {
+  color: #aaa;
+  font-size: 0.95rem;
+}
+
+.main {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  align-items: flex-start;
+}
+
+/* ── Streams ─────────────────────────────────── */
+.streams {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.stream-box {
+  flex: 1;
+  min-width: 300px;
+  background: #1a1a2e;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #0f3460;
+}
+
+.stream-label {
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: #00d4ff;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+}
+
+.stream-box img {
+  width: 100%;
+  display: block;
+}
+
+/* ── Control Panel ───────────────────────────── */
+.panel {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.section {
+  background: #1a1a2e;
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid #0f3460;
+}
+
+.section h3 {
+  font-size: 0.9rem;
+  color: #00d4ff;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #0f3460;
+  padding-bottom: 6px;
+}
+
+/* ── Buttons ─────────────────────────────────── */
+.btn-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.color-btn {
+  flex: 1;
+  min-width: 60px;
+  padding: 8px 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.color-btn:hover {
+  border-color: #fff;
+  transform: scale(1.05);
+}
+
+.tool-btn {
+  flex: 1;
+  min-width: 60px;
+  padding: 8px 4px;
+  background: #0f3460;
+  color: #fff;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.tool-btn:hover {
+  background: #00d4ff;
+  color: #000;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: 0.2s;
+}
+
+.clear-btn {
+  background: #c0392b;
+  color: #fff;
+}
+
+.clear-btn:hover { background: #e74c3c; }
+
+.save-btn {
+  background: #27ae60;
+  color: #fff;
+}
+
+.save-btn:hover { background: #2ecc71; }
+
+/* ── Status Box ──────────────────────────────── */
+#status-box p {
+  font-size: 0.85rem;
+  color: #ccc;
+  margin: 4px 0;
+}
+
+#status-box span {
+  color: #00d4ff;
+  font-weight: bold;
+}
+
+/* ── Toast ───────────────────────────────────── */
+#toast {
+  margin-top: 8px;
+  padding: 8px;
+  background: #00d4ff;
+  color: #000;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+/* ── Gesture Guide ───────────────────────────── */
+.guide table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.guide td {
+  padding: 5px 4px;
+  font-size: 0.82rem;
+  border-bottom: 1px solid #0f3460;
+  color: #ccc;
+}
+
+.guide td:first-child {
+  color: #fff;
+  font-weight: bold;
+  width: 50%;
+}

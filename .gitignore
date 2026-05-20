@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# Data folder (too large for github)
+data/
+
+# Saved files
+canvas_saved.png
+gesture_model.pkl
+
+# PyCharm
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
