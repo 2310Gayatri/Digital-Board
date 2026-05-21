@@ -45,8 +45,8 @@ A real-time hand gesture controlled digital drawing board built with Python, Ope
 ## Installation
 
 1. Clone the repository:
-   git clone https://github.com/YOURUSERNAME/digital-board.git
-   cd digital-board
+   git clone https://github.com/2310Gayatri/Digital-Board.git
+   cd Digital-Board
 
 2. Install dependencies:
    pip install -r requirements.txt
@@ -60,7 +60,6 @@ A real-time hand gesture controlled digital drawing board built with Python, Ope
 5. Or run the web app:
    python app.py
    Then open http://127.0.0.1:5000
-
 ---
 
 ## Login Credentials (Web App)
