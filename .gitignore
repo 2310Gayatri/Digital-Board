@@ -6,22 +6,26 @@ __pycache__/
 .Python
 *.egg
 *.egg-info/
+dist/
+build/
 
 # Virtual Environment
 venv/
 env/
-.env
+.env/
+.venv/
 
-# Data folder (too large for github)
+# Data folders (too large for GitHub)
 data/
-
-# Saved files
-canvas_saved.png
 gesture_model.pkl
 
-# PyCharm
+# Saved canvas images
+canvas_saved.png
+*.png
+*.jpg
+
+# PyCharm files
 .idea/
-*.iml
 
 # OS files
 .DS_Store

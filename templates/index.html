@@ -1,33 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Digital Board</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css"/>
 </head>
 <body>
 
+  <!-- ── Header ───────────────────────────────── -->
   <div class="header">
-    <h1>✋ Digital Board</h1>
-    <p>Use hand gestures to draw | Controls on the right panel</p>
+    <div class="header-left">
+      <h1>✋ Digital Board</h1>
+      <p>Use hand gestures to draw | Controls on the right panel</p>
+    </div>
+    <div class="header-right">
+      <span class="welcome-text">👤 {{ username }}</span>
+      <a href="/logout" class="logout-btn">Logout</a>
+    </div>
   </div>
 
   <div class="main">
 
-    <!-- Left: Camera + Canvas side by side -->
+    <!-- ── Streams ──────────────────────────────── -->
     <div class="streams">
       <div class="stream-box">
         <p class="stream-label">📷 Camera + Drawing</p>
-        <img src="/video_feed" alt="Camera Feed" />
+        <img src="/video_feed" alt="Camera Feed"/>
       </div>
       <div class="stream-box">
         <p class="stream-label">🖼️ Canvas Only</p>
-        <img src="/canvas_feed" alt="Canvas Feed" />
+        <img src="/canvas_feed" alt="Canvas Feed"/>
       </div>
     </div>
 
-    <!-- Right: Control Panel -->
+    <!-- ── Control Panel ────────────────────────── -->
     <div class="panel">
 
       <!-- Status -->
@@ -42,7 +49,7 @@
 
       <!-- Colors -->
       <div class="section">
-        <h3>🎨 Colors</h3>
+        <h3>🎨 Colors  (keys 1–5)</h3>
         <div class="btn-grid">
           <button class="color-btn" style="background:#e74c3c"
                   onclick="setColor('Red')">Red</button>
@@ -107,7 +114,7 @@
   </div>
 
   <script>
-    // ── API Calls ────────────────────────────────────────────
+    // ── API Calls ──────────────────────────────────────────
     async function setColor(name) {
       await fetch('/set_color', {
         method: 'POST',
@@ -145,7 +152,7 @@
       showToast('Canvas Saved as canvas_saved.png');
     }
 
-    // ── Status Updater ───────────────────────────────────────
+    // ── Status Updater ─────────────────────────────────────
     async function updateStatus() {
       try {
         const res  = await fetch('/status');
@@ -157,7 +164,18 @@
     }
     setInterval(updateStatus, 1000);
 
-    // ── Toast Notification ───────────────────────────────────
+    // ── Keyboard Shortcuts (1-5 for colors) ───────────────
+    document.addEventListener('keydown', async (e) => {
+      const colorKeys = {
+        '1': 'Red', '2': 'Green', '3': 'Blue',
+        '4': 'Yellow', '5': 'White'
+      };
+      if (colorKeys[e.key]) {
+        await setColor(colorKeys[e.key]);
+      }
+    });
+
+    // ── Toast Notification ─────────────────────────────────
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.textContent = msg;

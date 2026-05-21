@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Digital Board — Login</title>
+  <link rel="stylesheet" href="/static/login.css"/>
+</head>
+<body>
+
+  <div class="bg">
+    <!-- Animated background dots -->
+    <div class="dot d1"></div>
+    <div class="dot d2"></div>
+    <div class="dot d3"></div>
+  </div>
+
+  <div class="wrapper">
+
+    <!-- Logo / Title -->
+    <div class="logo-box">
+      <div class="logo-icon">✋</div>
+      <h1>Digital Board</h1>
+      <p>Hand Gesture Drawing Platform</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="card">
+
+      <h2>Welcome Back</h2>
+      <p class="subtitle">Sign in to continue</p>
+
+      <!-- Error message (shows only on wrong login) -->
+      {% if error %}
+      <div class="error-box">
+        ⚠️ {{ error }}
+      </div>
+      {% endif %}
+
+      <!-- Login Form -->
+      <form method="POST" action="/login">
+
+        <div class="input-group">
+          <label for="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            placeholder="Enter your username"
+            required
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+          />
+        </div>
+
+        <button type="submit" class="login-btn">
+          Sign In →
+        </button>
+
+      </form>
+
+      <!-- Hint -->
+      <div class="hint-box">
+        <p>Demo credentials:</p>
+        <p>Username: <strong>admin</strong> &nbsp;|&nbsp; Password: <strong>1234</strong></p>
+      </div>
+
+    </div>
+
+    <p class="footer">Digital Board Project &copy; 2025</p>
+
+  </div>
+
+</body>
+</html>

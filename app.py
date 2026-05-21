@@ -1,22 +1,31 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-import base64
 import threading
-from flask import Flask, render_template, Response, jsonify, request
+from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, session
 
+# ── Flask Setup ───────────────────────────────────────────────
 app = Flask(__name__)
+app.secret_key = 'digitalboard2025'
 
-# ── MediaPipe Setup ──────────────────────────────────────────
+# ── Hardcoded Users ───────────────────────────────────────────
+USERS = {
+    'admin': '1234',
+    'user1': 'pass1',
+    'user2': 'pass2',
+}
+
+# ── MediaPipe Setup ───────────────────────────────────────────
 mp_hands = mp.solutions.hands
 hands    = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7)
 mp_draw  = mp.solutions.drawing_utils
 
-# ── Webcam ───────────────────────────────────────────────────
+# ── Webcam ────────────────────────────────────────────────────
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-# ── State Variables ──────────────────────────────────────────
+# ── State Variables ───────────────────────────────────────────
 canvas         = None
 prev_x, prev_y = 0, 0
 mode           = "None"
@@ -81,26 +90,33 @@ def detect_and_draw_shape(canvas, points, color, thickness):
 
     if len(approx) == 3:
         cv2.polylines(canvas, [approx], True, color, thickness)
+        print("Shape snapped: Triangle")
     elif len(approx) == 4:
         x, y, w, h = cv2.boundingRect(approx)
         cv2.rectangle(canvas, (x, y), (x + w, y + h), color, thickness)
+        print("Shape snapped: Rectangle")
     else:
         (cx, cy), radius = cv2.minEnclosingCircle(pts)
         cv2.circle(canvas, (int(cx), int(cy)), int(radius), color, thickness)
+        print("Shape snapped: Circle")
 
 
 def draw_stroke(canvas, px, py, x, y, color, thickness, tool):
     global dot_counter
+
     if tool == "Normal":
         cv2.line(canvas, (px, py), (x, y), color, thickness)
+
     elif tool == "Dotted":
         dot_counter += 1
         if dot_counter % 4 == 0:
             cv2.circle(canvas, (x, y), thickness // 2 + 1, color, -1)
+
     elif tool == "Highlighter":
         overlay = canvas.copy()
         cv2.line(overlay, (px, py), (x, y), color, thickness * 4)
         cv2.addWeighted(overlay, 0.3, canvas, 0.7, 0, canvas)
+
     elif tool == "Spray":
         for _ in range(25):
             ox = int(np.random.normal(0, thickness * 2))
@@ -133,6 +149,7 @@ def process_frame(frame):
             ix = int(hand_landmarks.landmark[8].x * w)
             iy = int(hand_landmarks.landmark[8].y * h)
 
+            # Shape mode — 3 fingers
             if finger_count == 3:
                 mode          = "Shape"
                 shape_drawing = True
@@ -140,6 +157,7 @@ def process_frame(frame):
                 cv2.circle(frame, (ix, iy), 4, current_color, -1)
                 prev_x, prev_y = 0, 0
 
+            # Snap shape — fist / 0-1 fingers
             elif finger_count <= 1 and shape_drawing:
                 with lock:
                     detect_and_draw_shape(canvas, shape_points,
@@ -149,6 +167,7 @@ def process_frame(frame):
                 mode          = "None"
                 prev_x, prev_y = 0, 0
 
+            # Writing — 2 fingers
             elif finger_count == 2:
                 mode          = "Writing"
                 shape_drawing = False
@@ -159,6 +178,7 @@ def process_frame(frame):
                                 current_color, pen_thickness, pen_tool)
                 prev_x, prev_y = ix, iy
 
+            # Wiping — 4+ fingers
             elif finger_count >= 4:
                 mode          = "Wiping"
                 shape_drawing = False
@@ -171,7 +191,6 @@ def process_frame(frame):
                 mode = "None"
                 prev_x, prev_y = 0, 0
 
-            # Show mode on frame
             cv2.putText(frame, f"Mode: {mode}", (15, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, current_color, 2)
 
@@ -197,7 +216,6 @@ def process_frame(frame):
 
 
 def generate_camera():
-    """Stream camera+drawing frames to browser."""
     while True:
         success, frame = cap.read()
         if not success:
@@ -211,7 +229,6 @@ def generate_camera():
 
 
 def generate_canvas():
-    """Stream canvas-only frames to browser."""
     while True:
         success, _ = cap.read()
         if not success:
@@ -234,32 +251,64 @@ def generate_canvas():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('index.html', username=session['user'])
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if 'user' in session:
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        if username in USERS and USERS[username] == password:
+            session['user'] = username
+            return redirect(url_for('index'))
+        else:
+            error = 'Wrong username or password. Try again.'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
 
 
 @app.route('/video_feed')
 def video_feed():
+    if 'user' not in session:
+        return redirect(url_for('login'))
     return Response(generate_camera(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/canvas_feed')
 def canvas_feed():
+    if 'user' not in session:
+        return redirect(url_for('login'))
     return Response(generate_canvas(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/set_color', methods=['POST'])
 def set_color():
+    if 'user' not in session:
+        return jsonify({"error": "unauthorized"}), 401
     global current_color
-    data  = request.json
-    name  = data.get('color', 'White')
+    data          = request.json
+    name          = data.get('color', 'White')
     current_color = color_map.get(name, (255, 255, 255))
     return jsonify({"status": "ok", "color": name})
 
 
 @app.route('/set_tool', methods=['POST'])
 def set_tool():
+    if 'user' not in session:
+        return jsonify({"error": "unauthorized"}), 401
     global pen_tool
     data     = request.json
     pen_tool = data.get('tool', 'Normal')
@@ -268,6 +317,8 @@ def set_tool():
 
 @app.route('/set_thickness', methods=['POST'])
 def set_thickness():
+    if 'user' not in session:
+        return jsonify({"error": "unauthorized"}), 401
     global pen_thickness
     data          = request.json
     key           = data.get('size', 'S')
@@ -277,6 +328,8 @@ def set_thickness():
 
 @app.route('/clear', methods=['POST'])
 def clear():
+    if 'user' not in session:
+        return jsonify({"error": "unauthorized"}), 401
     global canvas
     with lock:
         if canvas is not None:
@@ -286,6 +339,8 @@ def clear():
 
 @app.route('/save', methods=['POST'])
 def save():
+    if 'user' not in session:
+        return jsonify({"error": "unauthorized"}), 401
     with lock:
         if canvas is not None:
             cv2.imwrite("canvas_saved.png", canvas)
@@ -294,6 +349,8 @@ def save():
 
 @app.route('/status')
 def status():
+    if 'user' not in session:
+        return jsonify({"error": "unauthorized"}), 401
     return jsonify({
         "mode":      mode,
         "tool":      pen_tool,
