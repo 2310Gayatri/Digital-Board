@@ -1,8 +1,18 @@
+import os
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import cv2
-import mediapipe as mp
 import numpy as np
 import threading
-from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, session
+import mediapipe as mp
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision as mp_vision
+from mediapipe.framework.formats import landmark_pb2
+from flask import (Flask, render_template, Response,
+                   jsonify, request, redirect, url_for, session)
+
+print("✅ MediaPipe loaded successfully")
 
 # ── Flask Setup ───────────────────────────────────────────────
 app = Flask(__name__)
@@ -15,10 +25,33 @@ USERS = {
     'user2': 'pass2',
 }
 
-# ── MediaPipe Setup ───────────────────────────────────────────
-mp_hands = mp.solutions.hands
-hands    = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7)
-mp_draw  = mp.solutions.drawing_utils
+# ── MediaPipe New API Setup ───────────────────────────────────
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'hand_landmarker.task')
+
+# Download model if not exists
+if not os.path.exists(MODEL_PATH):
+    import urllib.request
+    print("Downloading MediaPipe hand model...")
+    urllib.request.urlretrieve(
+        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+        MODEL_PATH
+    )
+    print("✅ Model downloaded successfully")
+
+base_options  = mp_python.BaseOptions(model_asset_path=MODEL_PATH)
+hand_options  = mp_vision.HandLandmarkerOptions(
+    base_options=base_options,
+    num_hands=1,
+    min_hand_detection_confidence=0.7,
+    min_hand_presence_confidence=0.7,
+    min_tracking_confidence=0.5
+)
+hand_detector = mp_vision.HandLandmarker.create_from_options(hand_options)
+
+# For drawing landmarks
+mp_drawing      = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_hands_connections = mp.solutions.hands.HAND_CONNECTIONS
 
 # ── Webcam ────────────────────────────────────────────────────
 cap = cv2.VideoCapture(0)
@@ -60,24 +93,45 @@ thickness_map = {
 #  HELPER FUNCTIONS
 # ════════════════════════════════════════════════════════════
 
-def count_fingers(hand_landmarks):
+def count_fingers(landmarks):
+    """Count extended fingers from landmark list."""
     finger_tips = [8, 12, 16, 20]
     finger_pip  = [6, 10, 14, 18]
-    thumb_tip, thumb_ip = 4, 3
+
     fingers = []
 
-    if hand_landmarks.landmark[thumb_tip].x < hand_landmarks.landmark[thumb_ip].x:
+    # Thumb — x comparison
+    if landmarks[4].x < landmarks[3].x:
         fingers.append(1)
     else:
         fingers.append(0)
 
+    # Other fingers — y comparison
     for tip, pip in zip(finger_tips, finger_pip):
-        if hand_landmarks.landmark[tip].y < hand_landmarks.landmark[pip].y:
+        if landmarks[tip].y < landmarks[pip].y:
             fingers.append(1)
         else:
             fingers.append(0)
 
     return sum(fingers)
+
+
+def draw_landmarks_on_frame(frame, hand_landmarks_list):
+    """Draw hand landmarks using new API."""
+    for hand_landmarks in hand_landmarks_list:
+        hand_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
+        hand_landmarks_proto.landmark.extend([
+            landmark_pb2.NormalizedLandmark(
+                x=lm.x, y=lm.y, z=lm.z
+            ) for lm in hand_landmarks
+        ])
+        mp_drawing.draw_landmarks(
+            frame,
+            hand_landmarks_proto,
+            mp_hands_connections,
+            mp_drawing_styles.get_default_hand_landmarks_style(),
+            mp_drawing_styles.get_default_hand_connections_style()
+        )
 
 
 def detect_and_draw_shape(canvas, points, color, thickness):
@@ -137,68 +191,81 @@ def process_frame(frame):
     if canvas is None:
         canvas = np.zeros((h, w, 3), np.uint8)
 
-    rgb    = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    result = hands.process(rgb)
+    # Convert to MediaPipe image format
+    rgb_frame  = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    mp_image   = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
 
-    if result.multi_hand_landmarks:
-        for hand_landmarks in result.multi_hand_landmarks:
-            mp_draw.draw_landmarks(frame, hand_landmarks,
-                                   mp_hands.HAND_CONNECTIONS)
+    # Detect hands
+    result = hand_detector.detect(mp_image)
 
-            finger_count = count_fingers(hand_landmarks)
-            ix = int(hand_landmarks.landmark[8].x * w)
-            iy = int(hand_landmarks.landmark[8].y * h)
+    if result.hand_landmarks:
+        # Draw landmarks
+        draw_landmarks_on_frame(frame, result.hand_landmarks)
 
-            # Shape mode — 3 fingers
-            if finger_count == 3:
-                mode          = "Shape"
-                shape_drawing = True
-                shape_points.append((ix, iy))
-                cv2.circle(frame, (ix, iy), 4, current_color, -1)
-                prev_x, prev_y = 0, 0
+        # Get first hand landmarks
+        landmarks    = result.hand_landmarks[0]
+        finger_count = count_fingers(landmarks)
 
-            # Snap shape — fist / 0-1 fingers
-            elif finger_count <= 1 and shape_drawing:
-                with lock:
-                    detect_and_draw_shape(canvas, shape_points,
-                                          current_color, pen_thickness)
-                shape_points  = []
-                shape_drawing = False
-                mode          = "None"
-                prev_x, prev_y = 0, 0
+        # Get index fingertip position
+        ix = int(landmarks[8].x * w)
+        iy = int(landmarks[8].y * h)
 
-            # Writing — 2 fingers
-            elif finger_count == 2:
-                mode          = "Writing"
-                shape_drawing = False
-                if prev_x == 0 and prev_y == 0:
-                    prev_x, prev_y = ix, iy
-                with lock:
-                    draw_stroke(canvas, prev_x, prev_y, ix, iy,
-                                current_color, pen_thickness, pen_tool)
+        # Shape mode — 3 fingers
+        if finger_count == 3:
+            mode          = "Shape"
+            shape_drawing = True
+            shape_points.append((ix, iy))
+            cv2.circle(frame, (ix, iy), 4, current_color, -1)
+            prev_x, prev_y = 0, 0
+
+        # Snap shape — fist / 0-1 fingers
+        elif finger_count <= 1 and shape_drawing:
+            with lock:
+                detect_and_draw_shape(
+                    canvas, shape_points,
+                    current_color, pen_thickness
+                )
+            shape_points  = []
+            shape_drawing = False
+            mode          = "None"
+            prev_x, prev_y = 0, 0
+
+        # Writing — 2 fingers
+        elif finger_count == 2:
+            mode          = "Writing"
+            shape_drawing = False
+            if prev_x == 0 and prev_y == 0:
                 prev_x, prev_y = ix, iy
+            with lock:
+                draw_stroke(
+                    canvas, prev_x, prev_y, ix, iy,
+                    current_color, pen_thickness, pen_tool
+                )
+            prev_x, prev_y = ix, iy
 
-            # Wiping — 4+ fingers
-            elif finger_count >= 4:
-                mode          = "Wiping"
-                shape_drawing = False
-                shape_points  = []
-                with lock:
-                    cv2.circle(canvas, (ix, iy), 60, (0, 0, 0), -1)
-                prev_x, prev_y = 0, 0
+        # Wiping — 4+ fingers
+        elif finger_count >= 4:
+            mode          = "Wiping"
+            shape_drawing = False
+            shape_points  = []
+            with lock:
+                cv2.circle(canvas, (ix, iy), 60, (0, 0, 0), -1)
+            prev_x, prev_y = 0, 0
 
-            else:
-                mode = "None"
-                prev_x, prev_y = 0, 0
+        else:
+            mode = "None"
+            prev_x, prev_y = 0, 0
 
-            cv2.putText(frame, f"Mode: {mode}", (15, 40),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, current_color, 2)
+        cv2.putText(frame, f"Mode: {mode}", (15, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, current_color, 2)
 
     else:
         if shape_drawing and len(shape_points) >= 10:
             with lock:
-                detect_and_draw_shape(canvas, shape_points,
-                                      current_color, pen_thickness)
+                detect_and_draw_shape(
+                    canvas, shape_points,
+                    current_color, pen_thickness
+                )
         shape_points  = []
         shape_drawing = False
         prev_x, prev_y = 0, 0
@@ -221,8 +288,10 @@ def generate_camera():
         if not success:
             break
         frame = process_frame(frame)
-        _, buffer = cv2.imencode('.jpg', frame,
-                                  [cv2.IMWRITE_JPEG_QUALITY, 80])
+        _, buffer = cv2.imencode(
+            '.jpg', frame,
+            [cv2.IMWRITE_JPEG_QUALITY, 80]
+        )
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' +
                buffer.tobytes() + b'\r\n')
@@ -238,8 +307,10 @@ def generate_canvas():
                 c = canvas.copy()
             else:
                 c = np.zeros((720, 1280, 3), np.uint8)
-        _, buffer = cv2.imencode('.jpg', c,
-                                  [cv2.IMWRITE_JPEG_QUALITY, 80])
+        _, buffer = cv2.imencode(
+            '.jpg', c,
+            [cv2.IMWRITE_JPEG_QUALITY, 80]
+        )
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' +
                buffer.tobytes() + b'\r\n')
@@ -282,16 +353,20 @@ def logout():
 def video_feed():
     if 'user' not in session:
         return redirect(url_for('login'))
-    return Response(generate_camera(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate_camera(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
 
 
 @app.route('/canvas_feed')
 def canvas_feed():
     if 'user' not in session:
         return redirect(url_for('login'))
-    return Response(generate_canvas(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate_canvas(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
 
 
 @app.route('/set_color', methods=['POST'])
