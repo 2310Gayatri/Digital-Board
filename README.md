@@ -19,7 +19,7 @@ just your hand — no mouse, stylus or touchscreen needed!
 
 ## 📸 Demo Video
 
-> 🎥 Record your demo and add YouTube link here
+> 🎥 Video Will be shared Soon!
 
 ---
 
